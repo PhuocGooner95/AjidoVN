@@ -1,0 +1,2 @@
+# Only stdlib needed — urllib, smtplib, json all built-in
+# Keep this file for explicit documentation of zero external deps

@@ -1,0 +1,73 @@
+name: SAPO Daily Revenue Report
+
+on:
+  schedule:
+    # GitHub Actions cron is UTC. Convert from Asia/Ho_Chi_Minh (UTC+7):
+    #   10:03 VN = 03:03 UTC
+    #   17:03 VN = 10:03 UTC
+    #   23:59 VN = 16:59 UTC
+    - cron: '3 3 * * *'      # Morning snapshot
+    - cron: '3 10 * * *'     # Afternoon snapshot
+    - cron: '59 16 * * *'    # End-of-day chốt ngày
+  workflow_dispatch:
+    inputs:
+      slot:
+        description: 'Slot to run'
+        required: true
+        default: 'eod'
+        type: choice
+        options: [morning, afternoon, eod]
+      today:
+        description: 'Override date (YYYY-MM-DD), blank = today VN'
+        required: false
+        default: ''
+
+jobs:
+  send-report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Determine slot from UTC hour
+        id: slot
+        shell: bash
+        run: |
+          if [ -n "${{ github.event.inputs.slot }}" ]; then
+            echo "slot=${{ github.event.inputs.slot }}" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          HOUR=$(date -u +%H)
+          case "$HOUR" in
+            03) echo "slot=morning"   >> $GITHUB_OUTPUT ;;
+            10) echo "slot=afternoon" >> $GITHUB_OUTPUT ;;
+            16|17) echo "slot=eod"    >> $GITHUB_OUTPUT ;;
+            *) echo "slot=eod"        >> $GITHUB_OUTPUT ;;
+          esac
+
+      - name: Run orchestrator
+        env:
+          SAPO_STORE_NAME: ${{ secrets.SAPO_STORE_NAME }}
+          SAPO_ACCESS_TOKEN: ${{ secrets.SAPO_ACCESS_TOKEN }}
+          SAPO_API_KEY: ${{ secrets.SAPO_API_KEY }}
+          SAPO_API_SECRET: ${{ secrets.SAPO_API_SECRET }}
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          EMAIL_TO: ${{ secrets.EMAIL_TO }}
+          EMAIL_CC: ${{ secrets.EMAIL_CC }}
+          SLOT: ${{ steps.slot.outputs.slot }}
+          TODAY: ${{ github.event.inputs.today }}
+        run: python orchestrator.py
+
+      - name: Upload HTML artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sapo-report-${{ steps.slot.outputs.slot }}-${{ github.run_id }}
+          path: reports/*.html
+          retention-days: 30

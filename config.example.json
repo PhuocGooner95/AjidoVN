@@ -1,0 +1,6 @@
+{
+  "smtp_user": "ajido.vn@gmail.com",
+  "smtp_password": "XXXX_XXXX_XXXX_XXXX_app_password_here",
+  "to": ["ajido.vn@gmail.com"],
+  "cc": []
+}
