@@ -42,10 +42,18 @@ def get_auth():
 
 
 def call_api(store: str, headers: dict, path: str, params: dict) -> dict:
-    """GET https://<store>.mysapo.net/admin/<path> with query params."""
+    """GET https://<store>.mysapo.net/admin/<path> with query params.
+
+    Note: SAPO's Cloudflare layer blocks the default Python User-Agent
+    (returns 403). We send a browser-like UA to bypass that filter.
+    """
     qs = urllib.parse.urlencode(params)
     url = f"https://{store}.mysapo.net/admin/{path}?{qs}"
-    req = urllib.request.Request(url, headers={**headers, "Accept": "application/json"})
+    req = urllib.request.Request(url, headers={
+        **headers,
+        "Accept": "application/json",
+        "User-Agent": "Mozilla/5.0 (sapo-daily-report/1.0)",
+    })
     with urllib.request.urlopen(req, timeout=60) as resp:
         return json.loads(resp.read().decode("utf-8"))
 
